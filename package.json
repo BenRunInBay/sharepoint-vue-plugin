@@ -1,0 +1,18 @@
+{
+  "name": "sharepoint-vue-plugin",
+  "version": "1.0.0",
+  "description": "Access SharePoint REST API through Vue components.",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "keywords": [
+    "VueJS",
+    "SharePoint"
+  ],
+  "author": "Ben Hoffmann",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.18.0"
+  }
+}
