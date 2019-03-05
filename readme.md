@@ -17,7 +17,7 @@ created() {
     // read data from a list immediately
     this.$sp.getList({
         listName: 'MyList',
-        select: "ID,Title
+        select: "ID,Title"
         })
         .then((listData) => {
             listData.forEach(item => {
