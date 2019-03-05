@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-03-05
+    Last updated 2019-03-05b
 
     Vue main.js entry:
         import SharePoint from '@/lib/SharePoint'
@@ -64,14 +64,14 @@ let baseConfig = {
 */
 export default {
   install(Vue, baseUrl, configUpdates) {
-    console.log("Base url: " + baseUrl);
+    console.log("Install plugin...");
     config = Object.assign(baseConfig, configUpdates);
     let sp = new SharePoint(baseUrl);
     Object.defineProperty(Vue.prototype, "$sp", { value: sp });
   }
 };
 
-export class SharePoint {
+class SharePoint {
   constructor(baseUrl) {
     // properties
     this.baseUrl = baseUrl;
@@ -98,19 +98,24 @@ export class SharePoint {
 
   /* 
     Obtain SharePoint form digest value used to validate that user has authority to write data to a list in that SP site.
-    If successful, calls success(digestValue)
-    Also sets timer to refresh digest on a periodic basis.
+      If successful, calls success(digestValue)
+      Also sets timer to refresh digest on a periodic basis.
+      Returns Promise
   */
-  getFormDigest(success, failure) {
+  getFormDigest() {
     let me = this;
+    me.log("Get digest value...");
     setInterval(() => {
-        me.getFormDigest().catch((error) => {return;});
-        me.log("Refreshed digest value");
-      }, config.formDigestRefreshInterval);
+      me.getFormDigest().catch(error => {
+        return;
+      });
+      me.log("Refreshed digest value");
+    }, config.formDigestRefreshInterval);
     return new Promise((resolve, reject) => {
       if (!me.inProduction) {
         me.digestValue = "dev digest value";
-        if (typeof success == "function") resolve("dev digest value");
+        me.log("dev digest value");
+        resolve("dev digest value");
       } else {
         axios
           .post(
@@ -132,7 +137,8 @@ export class SharePoint {
               else if (response.data.FormDigestValue)
                 me.digestValue = response.data.FormDigestValue;
               resolve(me.digestValue);
-            } reject("No digest provided");
+            }
+            reject("No digest provided");
           })
           .catch(function(error) {
             reject(error);
@@ -155,58 +161,52 @@ export class SharePoint {
 
   /*
       Get data
-      params = {
           baseUrl: (optional)
           path: (after baseUrl),
-          success: function(listData),
-          failure: function(error),
-          devStaticDataUrl: ""
-      }
+          devStaticDataUrl: url of local JSON file to use for testing/development
+        Returns Promise
   */
-  get(params) {
-    if (this.inProduction) {
-      axios
-        .get((params.baseUrl ? params.baseUrl : this.baseUrl) + params.path, {
-          cache: false,
-          withCredentials: true,
-          headers: {
-            Accept: "application/json;odata=verbose",
-            "Content-Type": "application/json;odata=verbose"
-          }
-        })
-        .then(function(response) {
-          if (
-            response &&
-            response.data &&
-            response.data.d &&
-            response.data.d.results &&
-            typeof params.success == "function"
-          )
-            params.success.call(this, response.data.d.results);
-        })
-        .catch(function(error) {
-          if (typeof params.failure == "function")
-            params.failure.call(this, error);
-        });
-    } else if (params.devStaticDataUrl) {
-      axios
-        .get(params.devStaticDataUrl, {})
-        .then(function(response) {
-          if (typeof params.success == "function" && response)
-            params.success.call(this, response.data);
-        })
-        .catch(function(error) {
-          if (typeof params.failure == "function")
-            params.failure.call(this, error);
-        });
-    } else {
-      if (typeof params.failure == "function")
-        params.failure.call(this, "No static data in dev");
-    }
+  _get({ baseUrl, path, devStaticDataUrl }) {
+    let me = this;
+    return new Promise((resolve, reject) => {
+      if (me.inProduction) {
+        axios
+          .get((baseUrl ? baseUrl : me.baseUrl) + path, {
+            cache: false,
+            withCredentials: true,
+            headers: {
+              Accept: "application/json;odata=verbose",
+              "Content-Type": "application/json;odata=verbose"
+            }
+          })
+          .then(response => {
+            if (
+              response &&
+              response.data &&
+              response.data.d &&
+              response.data.d.results
+            )
+              resolve(response.data.d.results);
+          })
+          .catch(error => {
+            reject(error);
+          });
+      } else if (devStaticDataUrl) {
+        axios
+          .get(devStaticDataUrl, {})
+          .then(response => {
+            if (response) resolve(response.data);
+          })
+          .catch(error => {
+            reject(error);
+          });
+      } else {
+        reject("No static data in dev");
+      }
+    });
   }
   /*
       Get data from a list
-      params = {
           baseUrl: <optional url>,
           listName: 'list name',
           select: 'field1,field2,field3',
@@ -214,99 +214,104 @@ export class SharePoint {
           expand: 'field1',
           orderby: "field1 asc|desc",
           top: <optional number>,
-          success: function(listData),
-          failure: function(error),
-          devStaticDataUrl: ""
-      }
+          devStaticDataUrl: url of local JSON file to use for testing/development
+        Returns Promise
   */
-  getList(params) {
-    var q = [];
-    if (params.top) q.push("$top=" + params.top);
-    if (params.orderby) q.push("$orderby=" + params.orderby);
-    if (params.select) q.push("$select=" + params.select);
-    if (params.expand) q.push("$expand=" + params.expand);
-    if (params.filter) q.push("$filter=" + params.filter);
-    this.get({
-      baseUrl: params.baseUrl,
-      path: `${config.listPath}getbytitle('${params.listName}')/items?${q.join(
-        "&"
-      )}`,
-      success: params.success,
-      failure: params.failure,
-      devStaticDataUrl: params.devStaticDataUrl
+  getListData({
+    baseUrl,
+    listName,
+    select,
+    filter,
+    expand,
+    orderby,
+    top,
+    devStaticDataUrl
+  }) {
+    let me = this;
+    return new Promise((resolve, reject) => {
+      var q = [];
+      if (top) q.push("$top=" + top);
+      if (orderby) q.push("$orderby=" + orderby);
+      if (select) q.push("$select=" + select);
+      if (expand) q.push("$expand=" + expand);
+      if (filter) q.push("$filter=" + filter);
+      me._get({
+        baseUrl: baseUrl,
+        path: `${config.listPath}getbytitle('${listName}')/items?${q.join(
+          "&"
+        )}`,
+        devStaticDataUrl: devStaticDataUrl
+      })
+        .then(data => {
+          resolve(data);
+        })
+        .catch(error => {
+          reject(error);
+        });
     });
   }
   /*
       Post data
-      params = {
-          path: ,
-          data: ,
-          success: function(data, itemUrl, etag),
-          failure: function(error)
-      }
   */
-  post(params) {
+  post({ path, data }) {
     let postMe = this;
-    if (params && params.path && params.data) {
-      if (!this.inProduction) {
-        if (config.showConsoleActivityInDev)
-          this.log("Post to SharePoint: " + JSON.stringify(params.data));
-        if (typeof params.success == "function")
-          params.success.call(this, params.data, "dev item url");
-      } else {
-        let url =
-          params.path.indexOf("//") > 0
-            ? params.path
-            : this.baseUrl + params.path;
-        axios
-          .post(url, params.data, {
-            withCredentials: true,
-            headers: {
-              Accept: "application/json;odata=verbose",
-              "Content-Type": "application/json;odata=verbose",
-              "X-RequestDigest": this.digestValue,
-              "X-HTTP-Method": "POST"
-            }
-          })
-          .then(function(response) {
-            let data =
-                response && response.data && response.data.d
-                  ? response.data.d
-                  : null,
-              metadata = data ? data.__metadata : null,
-              results = data ? data.results : null;
-            if (typeof params.success == "function") {
-              if (metadata)
-                params.success.call(postMe, data, metadata.uri, metadata.etag);
-              else if (results) params.success.call(postMe, results);
-              else params.success.call(postMe, response.data);
-            }
-          })
-          .catch(function(error) {
-            if (typeof params.failure == "function")
-              params.failure.call(postMe, error);
-          });
-      }
-    }
+    return new Promise((resolve, reject) => {
+      if (path && data) {
+        if (!postMe.inProduction) {
+          if (config.showConsoleActivityInDev)
+            postMe.log("Post to SharePoint: " + JSON.stringify(params.data));
+          resolve(data, "dev item url");
+        } else {
+          let url = path.indexOf("//") > 0 ? path : postMe.baseUrl + path;
+          axios
+            .post(url, data, {
+              withCredentials: true,
+              headers: {
+                Accept: "application/json;odata=verbose",
+                "Content-Type": "application/json;odata=verbose",
+                "X-RequestDigest": postMe.digestValue,
+                "X-HTTP-Method": "POST"
+              }
+            })
+            .then(function(response) {
+              let data =
+                  response && response.data && response.data.d
+                    ? response.data.d
+                    : null,
+                metadata = data ? data.__metadata : null,
+                results = data ? data.results : null;
+              if (metadata) resolve(data, metadata.uri, metadata.etag);
+              else if (results) resolve(results);
+              else resolve(response.data);
+            })
+            .catch(function(error) {
+              reject(error);
+            });
+        }
+      } else reject("No path or data provided");
+    });
   }
   /*
       Write data to a list, appending it as a new item
-      params = {
-          listName: ,
-          itemData: { field1: , field2: },
-          success: function(data, itemUrl),
-          failure: function(error)
-      }
   */
-  addListItem(params) {
-    if (params && params.listName && params.itemData) {
-      params.data = Object.assign(
-        { __metadata: { type: this.getListItemType(params.listName) } },
-        params.itemData
-      );
-      params.path = config.listPath + `getbytitle('${params.listName}')/items`;
-      this.post(params);
-    }
+  addListItem({ listName, itemData }) {
+    let me = this;
+    return new Promise((resolve, reject) => {
+      if (listName && itemData) {
+        let data = Object.assign(
+            { __metadata: { type: this.getListItemType(listName) } },
+            itemData
+          ),
+          path = config.listPath + `getbytitle('${listName}')/items`;
+        this.post({ path: path, data: data })
+          .then(responseData => {
+            resolve(responseData);
+          })
+          .catch(error => {
+            reject(error);
+          });
+      } else reject("No list or data provided");
+    });
   }
   /*
       Write data to a list, updating an existing item
@@ -375,7 +380,7 @@ export class SharePoint {
           failure: function(error)
       }
   */
-  delete(params) {
+  deleteListItem(params) {
     if (params && params.itemUrl) {
       if (!this.inProduction) {
         if (config.showConsoleActivityInDev)
@@ -409,48 +414,41 @@ export class SharePoint {
   */
   camlQuery({ listName, queryXml, success, failure, devStaticDataUrl }) {
     let me = this;
-    if (listName && queryXml) {
-      this.post({
-        path: `${config.listPath}getbytitle('${listName}')/getitems`,
-        data: {
-          query: {
-            __metadata: { type: "SP.CamlQuery" },
-            ViewXml: queryXml
-          }
-        },
-        success(results) {
-          if (typeof success == "function") success.call(this, results);
-        },
-        failure(error) {
-          if (typeof failure == "function") failure.call(this, error);
-        },
-        devStaticDataUrl: devStaticDataUrl
-      });
-    }
+    return new Promise((resolve, reject) => {
+      if (listName && queryXml) {
+        this.post({
+          path: `${config.listPath}getbytitle('${listName}')/getitems`,
+          data: {
+            query: {
+              __metadata: { type: "SP.CamlQuery" },
+              ViewXml: queryXml
+            }
+          },
+          devStaticDataUrl: devStaticDataUrl
+        })
+          .then(results => {
+            resolve(results);
+          })
+          .catch(error => {
+            reject(error);
+          });
+      } else reject("No list or query provided");
+    });
   }
 
   /*
-    Get ODATA-format query to retrieve matching comparisonList values
-    query = getQueryFilter(["Americas", "EMEIA"], "Area")
-    => (Area eq 'Americas' or Area eq 'EMEIA')
+    Get ODATA-formatted query to retrieve matching optionsArray values
+      query = getQueryFilter(["Americas", "EMEIA"], "Area")
+      returns: (Area eq 'Americas' or Area eq 'EMEIA')
   */
-  getQueryFilter(comparisonList, fieldName) {
-    if (
-      comparisonList &&
-      typeof comparisonList == "object" &&
-      comparisonList.length
-    ) {
+  orQueryFromArray(optionsArray, fieldName) {
+    if (Array.isArray(optionsArray) && fieldName) {
       let searchPattern = "";
-      comparisonList.forEach(compare => {
+      optionsArray.forEach(compare => {
         if (compare) {
-          // for (let key in odataReplacements)
-          //   compare = compare.replace(key, odataReplacements[key]);
           searchPattern +=
             (searchPattern.length ? " or " : "") +
-            fieldName +
-            " eq '" +
-            encodeURIComponent(compare) +
-            "'";
+            `${fieldName} eq '${encodeURIComponent(compare)}'`;
         }
       });
       return "(" + searchPattern + ")";
