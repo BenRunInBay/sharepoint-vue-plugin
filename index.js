@@ -103,43 +103,42 @@ export class SharePoint {
   */
   getFormDigest(success, failure) {
     let me = this;
-    if (!this.inProduction) {
-      this.digestValue = "dev digest value";
-      if (typeof success == "function") success.call(this, "dev digest value");
-    } else {
-      axios
-        .post(
-          me.baseUrl + "_api/contextinfo",
-          {},
-          {
-            withCredentials: true,
-            headers: {
-              Accept: "application/json; odata=verbose",
-              "X-HTTP-Method": "POST"
+    setInterval(() => {
+        me.getFormDigest().catch((error) => {return;});
+        me.log("Refreshed digest value");
+      }, config.formDigestRefreshInterval);
+    return new Promise((resolve, reject) => {
+      if (!me.inProduction) {
+        me.digestValue = "dev digest value";
+        if (typeof success == "function") resolve("dev digest value");
+      } else {
+        axios
+          .post(
+            me.baseUrl + "_api/contextinfo",
+            {},
+            {
+              withCredentials: true,
+              headers: {
+                Accept: "application/json; odata=verbose",
+                "X-HTTP-Method": "POST"
+              }
             }
-          }
-        )
-        .then(function(response) {
-          if (response && response.data) {
-            if (response.data.d && response.data.d.GetContextWebInformation)
-              me.digestValue =
-                response.data.d.GetContextWebInformation.FormDigestValue;
-            else if (response.data.FormDigestValue)
-              me.digestValue = response.data.FormDigestValue;
-
-            if (typeof success == "function") success.call(me, me.digestValue);
-          } else if (typeof failure == "function") failure.call(me, "No digest provided");
-        })
-        .catch(function(error) {
-          if (typeof failure == "function") failure.call(me, error);
-        });
-    }
-    setInterval(function() {
-      success = null;
-      failure = null;
-      me.getFormDigest();
-      me.log("Refreshed SharePoint digest.");
-    }, config.formDigestRefreshInterval);
+          )
+          .then(function(response) {
+            if (response && response.data) {
+              if (response.data.d && response.data.d.GetContextWebInformation)
+                me.digestValue =
+                  response.data.d.GetContextWebInformation.FormDigestValue;
+              else if (response.data.FormDigestValue)
+                me.digestValue = response.data.FormDigestValue;
+              resolve(me.digestValue);
+            } reject("No digest provided");
+          })
+          .catch(function(error) {
+            reject(error);
+          });
+      }
+    });
   }
 
   /* True if request digest is known */
@@ -586,14 +585,17 @@ export class SharePoint {
   retrieveCurrentUserProfile(params) {
     if (this.inProduction)
       axios
-        .get(config.currentUserPropertiesPrefix + config.myProfileDefaultSelect, {
-          cache: false,
-          withCredentials: true,
-          headers: {
-            Accept: "application/json;odata=verbose",
-            "Content-Type": "application/json;odata=verbose"
+        .get(
+          config.currentUserPropertiesPrefix + config.myProfileDefaultSelect,
+          {
+            cache: false,
+            withCredentials: true,
+            headers: {
+              Accept: "application/json;odata=verbose",
+              "Content-Type": "application/json;odata=verbose"
+            }
           }
-        })
+        )
         .then(function(response) {
           if (
             response &&
