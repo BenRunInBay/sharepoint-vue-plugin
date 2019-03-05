@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-03-05b
+    Last updated 2019-03-05c
 
     Vue main.js entry:
         import SharePoint from '@/lib/SharePoint'
@@ -88,17 +88,16 @@ class SharePoint {
       this.baseUrl = path;
     }
 
-    for (let n = 0; n < config.productionHosts.length; n++) {
-      if (location.href.indexOf(config.productionHosts[n]) >= 0) {
-        this.inProduction = true;
-        break;
-      }
-    }
+    if (Array.isArray(config.productionHosts))
+      config.productionHosts.forEach(host => {
+        this.inProduction =
+          this.inProduction || location.href.indexOf(host) >= 0;
+      });
   }
 
   /* 
     Obtain SharePoint form digest value used to validate that user has authority to write data to a list in that SP site.
-      If successful, calls success(digestValue)
+      If successful, resolves with retrieved digestValue.
       Also sets timer to refresh digest on a periodic basis.
       Returns Promise
   */
@@ -153,10 +152,6 @@ class SharePoint {
       (this.inProduction && this.digestValue != null) ||
       this.inProduction == false
     );
-  }
-
-  getDigest() {
-    return this.digestValue;
   }
 
   /*
@@ -253,23 +248,22 @@ class SharePoint {
   /*
       Post data
   */
-  post({ path, data }) {
-    let postMe = this;
+  _post({ path, data }) {
+    let me = this;
     return new Promise((resolve, reject) => {
       if (path && data) {
-        if (!postMe.inProduction) {
-          if (config.showConsoleActivityInDev)
-            postMe.log("Post to SharePoint: " + JSON.stringify(params.data));
+        if (!me.inProduction) {
+          me.log("Post to SharePoint: " + JSON.stringify(data));
           resolve(data, "dev item url");
         } else {
-          let url = path.indexOf("//") > 0 ? path : postMe.baseUrl + path;
+          let url = path.indexOf("//") > 0 ? path : me.baseUrl + path;
           axios
             .post(url, data, {
               withCredentials: true,
               headers: {
                 Accept: "application/json;odata=verbose",
                 "Content-Type": "application/json;odata=verbose",
-                "X-RequestDigest": postMe.digestValue,
+                "X-RequestDigest": me.digestValue,
                 "X-HTTP-Method": "POST"
               }
             })
@@ -299,11 +293,11 @@ class SharePoint {
     return new Promise((resolve, reject) => {
       if (listName && itemData) {
         let data = Object.assign(
-            { __metadata: { type: this.getListItemType(listName) } },
+            { __metadata: { type: me.getListItemType(listName) } },
             itemData
           ),
           path = config.listPath + `getbytitle('${listName}')/items`;
-        this.post({ path: path, data: data })
+        me._post({ path: path, data: data })
           .then(responseData => {
             resolve(responseData);
           })
@@ -316,107 +310,95 @@ class SharePoint {
   /*
       Write data to a list, updating an existing item
       First, reloads items to obtain etag value, then posts updates using the etag value and request digest
-      params = {
-          listName: ,
-          itemUrl:
-          itemData: { field1: , field2: },
-          success: function(data),
-          failure: function(error)
-      }
   */
-  updateListItem(params) {
-    let updateMe = this;
-    if (params && params.itemUrl && params.itemData) {
-      if (!this.inProduction) {
-        this.log("Update params: " + JSON.stringify(params));
-        if (typeof params.success == "function")
-          params.success.call(this, params.itemData);
-      } else {
-        let getETagParams = {
-          path: params.itemUrl,
-          data: {},
-          success: function(d, itemUrl, etag) {
-            if (etag) {
-              let updateData = Object.assign(
-                {
-                  __metadata: {
-                    type: updateMe.getListItemType(params.listName)
-                  }
-                },
-                params.itemData
-              );
-              axios
-                .post(params.itemUrl, JSON.stringify(updateData), {
-                  withCredentials: true,
-                  headers: {
-                    Accept: "application/json;odata=verbose",
-                    "Content-Type": "application/json;odata=verbose",
-                    "X-RequestDigest": updateMe.digestValue,
-                    "X-HTTP-Method": "MERGE",
-                    "If-Match": etag
-                  }
-                })
-                .then(function(response) {
-                  if (typeof params.success == "function" && response)
-                    params.success.call(updateMe, response.data);
-                })
-                .catch(function(error) {
-                  if (typeof params.failure == "function")
-                    params.failure.call(updateMe, error);
-                });
-            }
-          }
-        };
-        this.post(getETagParams);
-      }
-    }
+  updateListItem({ listName, itemData, itemUrl }) {
+    let me = this;
+    return new Promise((resolve, reject) => {
+      if (listName && itemUrl && itemData) {
+        if (!me.inProduction) {
+          resolve(itemData);
+        } else {
+          // obtain updated etag
+          me._post({
+            path: itemUrl,
+            data: {}
+          })
+            .then((itemUrl, etag) => {
+              if (etag) {
+                let updateData = Object.assign(
+                  {
+                    __metadata: {
+                      type: me.getListItemType(listName)
+                    }
+                  },
+                  itemData
+                );
+                axios
+                  .post(itemUrl, updateData, {
+                    withCredentials: true,
+                    headers: {
+                      Accept: "application/json;odata=verbose",
+                      "Content-Type": "application/json;odata=verbose",
+                      "X-RequestDigest": me.digestValue,
+                      "X-HTTP-Method": "MERGE",
+                      "If-Match": etag
+                    }
+                  })
+                  .then(function(response) {
+                    resolve(response.data);
+                  })
+                  .catch(function(error) {
+                    reject(error);
+                  });
+              }
+            })
+            .catch(error => {
+              reject(error);
+            });
+        }
+      } else reject("No list, item URL or data provided");
+    });
   }
 
   /*
       Delete an item
-      params = {
-          itemUrl: <url of the item> which you can find when loading them item as item.__metadata.uri
-          success: function(data),
-          failure: function(error)
-      }
   */
-  deleteListItem(params) {
-    if (params && params.itemUrl) {
-      if (!this.inProduction) {
-        if (config.showConsoleActivityInDev)
-          this.log(
-            "Delete item in SharePoint: " + JSON.stringify(params.itemUrl)
-          );
-        if (typeof params.success == "function") params.success.call(this);
-      } else {
-        axios
-          .post(params.itemUrl, null, {
-            withCredentials: true,
-            headers: {
-              "X-RequestDigest": this.digestValue,
-              "IF-MATCH": "*",
-              "X-HTTP-Method": "DELETE"
-            }
-          })
-          .then(function(response) {
-            if (typeof params.success == "function") params.success.call();
-          })
-          .catch(function(error) {
-            if (typeof params.failure == "function")
-              params.failure.call(this, error);
-          });
+  deleteListItem({ itemUrl }) {
+    let me = this;
+    return new Promise((resolve, reject) => {
+      if (itemUrl) {
+        if (!me.inProduction) {
+          me.log("Delete item in SharePoint: " + JSON.stringify(itemUrl));
+          resolve();
+        } else {
+          axios
+            .post(itemUrl, null, {
+              withCredentials: true,
+              headers: {
+                "X-RequestDigest": me.digestValue,
+                "IF-MATCH": "*",
+                "X-HTTP-Method": "DELETE"
+              }
+            })
+            .then(function(response) {
+              resolve(response);
+            })
+            .catch(function(error) {
+              reject(error);
+            });
+        }
       }
-    }
+    });
   }
 
   /*
     Post a CAML query and return the response
   */
-  camlQuery({ listName, queryXml, success, failure, devStaticDataUrl }) {
+  camlQuery({ listName, queryXml, devStaticDataUrl }) {
     let me = this;
     return new Promise((resolve, reject) => {
       if (listName && queryXml) {
-        this.post({
+        me._post({
           path: `${config.listPath}getbytitle('${listName}')/getitems`,
           data: {
             query: {
@@ -497,39 +479,83 @@ class SharePoint {
   }
 
   /*
- Retrieve profile data and pass it to success function
- accountName is in format i:0#.f|membership|first.last@ey.com
-    params = {
-        accountName: i:0#.f|membership|name@domain,
-        OR email: name@domain.com,
-        property: <optional>,
-        success: function(data),
-        failure: function(error)
-    }
- If property is not provided, then these fields are provided:
-    success({
-      PictureUrl,
-      Email,
-      DisplayName,
-      PersonalUrl,
-      Title (rank)
-    })
+  Retrieve profile data
+      accountName is in format i:0#.f|membership|first.last@ey.com
+      OR email: name@domain.com
+      property: <optional>
+  If property is not provided, then these fields are provided:
+      {
+        PictureUrl,
+        Email,
+        DisplayName,
+        PersonalUrl,
+        Title (rank)
+      }
  */
-  retrievePeopleProfile(params) {
-    if (this.inProduction) {
-      let accountName = params.accountName;
-      if (!accountName && params.email)
-        accountName = config.accountNamePrefix + params.email;
-      if (accountName) {
+  retrievePeopleProfile({accountName, email=null, property=null}) {
+    let me = this;
+    return new Promise((resolve, reject) => {
+      if (me.inProduction) {
+        let accountName = accountName;
+        if (!accountName && email)
+          accountName = config.accountNamePrefix + email;
+        if (accountName) {
+          axios
+            .get(
+              config.peopleManagerbaseUrl +
+                "'" +
+                escape(accountName) +
+                "'" +
+                (property
+                  ? "&$select=" + property
+                  : "&$select=" + config.profileDefaultSelect),
+              {
+                cache: false,
+                withCredentials: true,
+                headers: {
+                  Accept: "application/json;odata=verbose",
+                  "Content-Type": "application/json;odata=verbose"
+                }
+              }
+            )
+            .then(function(response) {
+              if (response && response.data && response.data.d)
+                resolve(response.data.d);
+            })
+            .catch(function(error) {
+              reject(error);
+            });
+        } else reject("No account name provided");
+      } else 
+        setTimeout(function() {
+          resolve({
+            DisplayName: "TEST NAME",
+            Email: "test@ey.com",
+            PersonalUrl: "",
+            Title: "Staff"
+          });
+        }, constDevLoadDelay);
+    });
+  }
+  /*
+  Retrieve profile of current user
+  Promised:
+    {
+      DisplayName,
+      AccountName,
+      Email,
+      PersonalUrl,
+      PicturUrl,
+      Title (rank)
+    }
+  */
+  retrieveCurrentUserProfile() {
+    let me = this;
+    return new Promise((resolve, reject) => {
+      if (me.inProduction)
         axios
           .get(
-            config.peopleManagerbaseUrl +
-              "'" +
-              escape(accountName) +
-              "'" +
-              (params.property
-                ? "&$select=" + params.property
-                : "&$select=" + config.profileDefaultSelect),
+            config.currentUserPropertiesPrefix + config.myProfileDefaultSelect,
             {
               cache: false,
               withCredentials: true,
@@ -540,178 +566,108 @@ class SharePoint {
             }
           )
           .then(function(response) {
-            if (
-              response &&
-              response.data &&
-              response.data.d &&
-              typeof params.success == "function"
-            )
-              params.success.call(this, response.data.d);
+            if (response && response.data && response.data.d)
+              resolve(response.data.d);
           })
           .catch(function(error) {
-            if (typeof params.failure == "function")
-              params.failure.call(this, error);
+            reject(error);
           });
-      } else if (typeof params.failure == "function")
-        params.failure.call(this, "No account name provided");
-    } else if (typeof params.success == "function")
-      setTimeout(function() {
-        params.success.call(this, {
-          DisplayName: "TEST NAME",
-          Email: "test@ey.com",
-          PersonalUrl: "",
-          Title: "Staff"
-        });
-      }, constDevLoadDelay);
-  }
-  /*
-  Retrieve profile of current user
-    params = {
-        success: function(data),
-        failure: function(error)
-    }
-  Promised:
-    success({
-      DisplayName,
-      AccountName,
-      Email,
-      PersonalUrl,
-      PicturUrl,
-      Title (rank)
-    })
-  */
-  retrieveCurrentUserProfile(params) {
-    if (this.inProduction)
-      axios
-        .get(
-          config.currentUserPropertiesPrefix + config.myProfileDefaultSelect,
-          {
-            cache: false,
-            withCredentials: true,
-            headers: {
-              Accept: "application/json;odata=verbose",
-              "Content-Type": "application/json;odata=verbose"
-            }
-          }
-        )
-        .then(function(response) {
-          if (
-            response &&
-            response.data &&
-            response.data.d &&
-            typeof params.success == "function"
-          )
-            params.success.call(this, response.data.d);
-        })
-        .catch(function(error) {
-          if (typeof params.failure == "function")
-            params.failure.call(this, error);
-        });
-    else if (typeof params.success == "function")
-      setTimeout(function() {
-        params.success.call(this, {
-          DisplayName: "CURRENT USER"
-        });
-      }, constDevLoadDelay);
+      else 
+        setTimeout(function() {
+          resolve({
+            DisplayName: "CURRENT USER"
+          });
+        }, constDevLoadDelay);
+    });
   }
   /*
     Check if user exists on current site. If not, add them.
-    Pass their ID to the success handler.
-      params = {
-          accountName: i:0#.f|membership|name@domain,
-          success: function(id),
-          failure: function(error)
-      }
+    Pass their ID to the resolve handler.
+        accountName: i:0#.f|membership|name@domain,
   */
-  ensureSiteUserId(params) {
-    if (this.inProduction)
-      axios
-        .post(
-          this.baseUrl + config.ensureUserUrl,
-          {
-            logonName: params.accountName
-          },
-          {
-            cache: false,
-            withCredentials: true,
-            headers: {
-              "X-RequestDigest": this.digestValue,
-              accept: "application/json;odata=verbose"
+  ensureSiteUserId(accountName) {
+    let me = this;
+    return new Promise((resolve, reject) => {
+      if (me.inProduction)
+        axios
+          .post(
+            me.baseUrl + config.ensureUserUrl,
+            {
+              logonName: accountName
+            },
+            {
+              cache: false,
+              withCredentials: true,
+              headers: {
+                "X-RequestDigest": me.digestValue,
+                accept: "application/json;odata=verbose"
+              }
             }
-          }
-        )
-        .then(function(response) {
-          if (
-            response &&
-            response.data &&
-            typeof params.success == "function"
-          ) {
-            params.success.call(this, response.data.Id);
-          }
-        })
-        .catch(function(error) {
-          if (typeof params.failure == "function")
-            params.failure.call(this, error);
-        });
-    else if (typeof params.success == "function")
-      params.success.call(this, 1234);
+          )
+          .then(function(response) {
+            if (response && response.data) {
+              resolve(response.data.Id);
+            }
+          })
+          .catch(function(error) {
+            reject(error);
+          });
+      else resolve(1234);
+    });
   }
   /*
     Send email using the SharePoint server
-      params: {
         from: "",
         to: [],
         subject: "",
         bodyHtml: "",
-        success(),
-        failure(error)
-      }
-    Promised:
-      success()
   */
-  sendEmail(params) {
-    let mailData = {
-      properties: {
-        __metadata: {
-          type: "SP.Utilities.EmailProperties"
-        },
-        From: params.from,
-        To: {
-          results: params.to
-        },
-        Subject: params.subject,
-        Body: params.bodyHtml
+  sendEmail({ from, to, subject, bodyHtml }) {
+    let me = this;
+    return new Promise((resolve, reject) => {
+      let mailData = {
+        properties: {
+          __metadata: {
+            type: "SP.Utilities.EmailProperties"
+          },
+          From: from,
+          To: {
+            results: to
+          },
+          Subject: subject,
+          Body: bodyHtml
+        }
+      };
+      if (me.inProduction)
+        axios
+          .post(me.baseUrl + config.sendEmailPath, mailData, {
+            withCredentials: true,
+            headers: {
+              Accept: "application/json;odata=verbose",
+              "Content-Type": "application/json;odata=verbose",
+              "X-RequestDigest": me.digestValue,
+              "X-HTTP-Method": "POST"
+            }
+          })
+          .then(function(response) {
+            resolve(response);
+          })
+          .catch(function(error) {
+            reject(error);
+          });
+      else {
+        me.log(`Send email to: ${to}`);
+        me.log(`From: ${from}`);
+        me.log(`Subject: ${subject}`);
+        me.log(`Body: ${bodyHtml}`);
+        resolve();
       }
-    };
-    if (this.inProduction)
-      axios
-        .post(this.baseUrl + config.sendEmailPath, mailData, {
-          withCredentials: true,
-          headers: {
-            Accept: "application/json;odata=verbose",
-            "Content-Type": "application/json;odata=verbose",
-            "X-RequestDigest": this.digestValue,
-            "X-HTTP-Method": "POST"
-          }
-        })
-        .then(function(response) {
-          if (typeof params.success == "function") params.success.call(this);
-        })
-        .catch(function(error) {
-          if (typeof params.failure == "function")
-            params.failure.call(this, error);
-        });
-    else if (config.showConsoleActivityInDev) {
-      this.log(`Send email to: ${params.to}`);
-      this.log(`From: ${params.from}`);
-      this.log(`Subject: ${params.subject}`);
-      this.log(`Body: ${params.bodyHtml}`);
-      if (typeof params.success == "function") params.success.call(this);
-    }
+    });
   }
 
   log(message) {
-    if (!this.inProduction) console.log(message);
+    if (!this.inProduction && config.showConsoleActivityInDev)
+      console.log(message);
   }
 
   getListItemType(name) {
