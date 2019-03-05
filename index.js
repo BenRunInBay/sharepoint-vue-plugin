@@ -18,7 +18,7 @@
 
     Within the Vue app or component, refer to the SharePoint as this.$sp
         created() {
-          this.$sp.getRequestDigest(() => {
+          this.$sp.getFormDigest(() => {
             // Once completed, you can start recording data to a list by specifying list name
             // and an object containing the column names of that list that you want to fill.
             this.$sp.addListItem({
@@ -97,11 +97,11 @@ export class SharePoint {
   }
 
   /* 
-    Obtain SharePoint request digest value used to validate that user has authority to write data to a list in that SP site.
+    Obtain SharePoint form digest value used to validate that user has authority to write data to a list in that SP site.
     If successful, calls success(digestValue)
     Also sets timer to refresh digest on a periodic basis.
   */
-  getRequestDigest(success, failure) {
+  getFormDigest(success, failure) {
     let me = this;
     if (!this.inProduction) {
       this.digestValue = "dev digest value";
@@ -137,7 +137,7 @@ export class SharePoint {
     setInterval(function() {
       success = null;
       failure = null;
-      me.getRequestDigest();
+      me.getFormDigest();
       me.log("Refreshed SharePoint digest.");
     }, config.formDigestRefreshInterval);
   }
