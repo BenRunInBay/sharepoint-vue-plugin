@@ -2,23 +2,17 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-03-05c
+    Last updated 2019-03-06
 
     Vue main.js entry:
         import SharePoint from '@/lib/SharePoint'
-        Vue.use(SharePoint, '/sites/MySite/')
-
-    Or use on a page:
-        //comment out axios module import below
-        <script src="axios.min.js"></script>
-        <script type="module">
-          import SharePoint from "./lib/SharePoint.VuePlugin.js";
-          Vue.use(SharePoint, '/sites/MySite/')
-        </script>
+        Vue.use(SharePoint, '/sites/MySite/', {
+          productionHosts: ["myhost.sharepoint.com"]
+        })
 
     Within the Vue app or component, refer to the SharePoint as this.$sp
         created() {
-          this.$sp.getFormDigest(() => {
+          this.$sp.getFormDigest().then(() => {
             // Once completed, you can start recording data to a list by specifying list name
             // and an object containing the column names of that list that you want to fill.
             this.$sp.addListItem({
@@ -50,7 +44,7 @@ let baseConfig = {
     siteUserPrefix: "_api/web/siteusers(@v)?@v='",
     ensureUserUrl: "_api/web/ensureuser",
     accountNamePrefix: "i:0#.f|membership|",
-    sendEmailPath: "/_api/SP.Utilities.Utility.SendEmail",
+    sendEmailPath: "_api/SP.Utilities.Utility.SendEmail",
     formDigestRefreshInterval: 19 * 60 * 1000
   },
   config = baseConfig;
@@ -64,7 +58,6 @@ let baseConfig = {
 */
 export default {
   install(Vue, baseUrl, configUpdates) {
-    console.log("Install plugin...");
     config = Object.assign(baseConfig, configUpdates);
     let sp = new SharePoint(baseUrl);
     Object.defineProperty(Vue.prototype, "$sp", { value: sp });
@@ -103,7 +96,6 @@ class SharePoint {
   */
   getFormDigest() {
     let me = this;
-    me.log("Get digest value...");
     setInterval(() => {
       me.getFormDigest().catch(error => {
         return;
@@ -113,7 +105,6 @@ class SharePoint {
     return new Promise((resolve, reject) => {
       if (!me.inProduction) {
         me.digestValue = "dev digest value";
-        me.log("dev digest value");
         resolve("dev digest value");
       } else {
         axios
@@ -161,12 +152,12 @@ class SharePoint {
           devStaticDataUrl: url of local JSON file to use for testing/development
         Returns Promise
   */
-  _get({ baseUrl, path, devStaticDataUrl }) {
+  _get({ baseUrl, path, url, devStaticDataUrl }) {
     let me = this;
     return new Promise((resolve, reject) => {
       if (me.inProduction) {
         axios
-          .get((baseUrl ? baseUrl : me.baseUrl) + path, {
+          .get(url ? url : (baseUrl ? baseUrl : me.baseUrl) + path, {
             cache: false,
             withCredentials: true,
             headers: {
@@ -175,13 +166,12 @@ class SharePoint {
             }
           })
           .then(response => {
-            if (
-              response &&
-              response.data &&
-              response.data.d &&
-              response.data.d.results
-            )
-              resolve(response.data.d.results);
+            if (response && response.data) {
+              if (response.data.d && response.data.d.results)
+                resolve(response.data.d.results);
+              else if (response.data.d) resolve(response.data.d);
+              else resolve(response.data);
+            }
           })
           .catch(error => {
             reject(error);
@@ -248,7 +238,7 @@ class SharePoint {
   /*
       Post data
   */
-  _post({ path, data }) {
+  _post({ path, url, data }) {
     let me = this;
     return new Promise((resolve, reject) => {
       if (path && data) {
@@ -256,9 +246,9 @@ class SharePoint {
           me.log("Post to SharePoint: " + JSON.stringify(data));
           resolve(data, "dev item url");
         } else {
-          let url = path.indexOf("//") > 0 ? path : me.baseUrl + path;
+          let postUrl = url ? url : me.baseUrl + path;
           axios
-            .post(url, data, {
+            .post(postUrl, data, {
               withCredentials: true,
               headers: {
                 Accept: "application/json;odata=verbose",
@@ -292,12 +282,13 @@ class SharePoint {
     let me = this;
     return new Promise((resolve, reject) => {
       if (listName && itemData) {
-        let data = Object.assign(
+        let addData = Object.assign(
             { __metadata: { type: me.getListItemType(listName) } },
             itemData
           ),
           path = config.listPath + `getbytitle('${listName}')/items`;
-        me._post({ path: path, data: data })
+        me.log(addData);
+        me._post({ path: path, data: addData })
           .then(responseData => {
             resolve(responseData);
           })
@@ -319,11 +310,11 @@ class SharePoint {
           resolve(itemData);
         } else {
           // obtain updated etag
-          me._post({
-            path: itemUrl,
-            data: {}
+          me._get({
+            url: itemUrl + "?$select=ID"
           })
-            .then((itemUrl, etag) => {
+            .then(data => {
+              let etag = me.getETag(data);
               if (etag) {
                 let updateData = Object.assign(
                   {
@@ -419,7 +410,7 @@ class SharePoint {
   }
 
   /*
-    Get ODATA-formatted query to retrieve matching optionsArray values
+    Get ODATA-formatted OR query to retrieve matching optionsArray values
       query = getQueryFilter(["Americas", "EMEIA"], "Area")
       returns: (Area eq 'Americas' or Area eq 'EMEIA')
   */
@@ -436,46 +427,77 @@ class SharePoint {
       return "(" + searchPattern + ")";
     } else return "";
   }
+  /*
+    Get ODATA-formatted AND query to retrieve matching optionsArray values
+      query = getQueryFilter(["Americas", "EMEIA"], "Area")
+      returns: (Area eq 'Americas' and Area eq 'EMEIA')
+  */
+  andQueryFromArray(optionsArray, fieldName) {
+    if (Array.isArray(optionsArray) && fieldName) {
+      let searchPattern = "";
+      optionsArray.forEach(compare => {
+        if (compare) {
+          searchPattern +=
+            (searchPattern.length ? " and " : "") +
+            `${fieldName} eq '${encodeURIComponent(compare)}'`;
+        }
+      });
+      return "(" + searchPattern + ")";
+    } else return "";
+  }
 
   /*
-    Reset the array and fill it with the values of the SharePoint listItem's results array
-    let countries = []
-    castListValuesTo({ID:1, results:[ {Title:"USA"}, {Title:"CA"} ]}, countries, "Country")
-    console.log(countries)
-    => [ "USA", "CA" ]
+    Get the update/delete item URL from the list item
   */
-  castListValuesTo(listItem, array, valuePropName) {
-    if (!valuePropName) valuePropName = "Title";
-    array.splice(0);
-    if (listItem && listItem.results) {
-      listItem.results.forEach(item => {
-        if (item && item[valuePropName]) array.push(item[valuePropName]);
-      });
-    }
+  getItemUrl(listItem) {
+    if (listItem && listItem.__metadata) return listItem.__metadata.uri;
+    else return null;
   }
   /*
-    Use this to build a results object containing the IDs of text keys
-    for writing a multi-value item to SharePoint list
-    based on a simple array of the text values.
-    For example, if you are storing an array of country codes as text,
-    and want to write it back to a SharePoint list multi-value field that
-    is referencing a separate list by ID, use this method to construct the results object.
-    let countryCodes = [ "FR", "CA" ];
-    let fullListOfCountryCodesToIDs = ["US": 1, "CA": 2, "FR": 3];
-    getIDResultsObject(fullListOfCountryCodesToIDs, countryCodes)
-    => { results: [3,2] }
+    Get the etag version number from the list item
   */
-  getIDResultsObject(fullKeyValueListOfTextToIDs, keyList) {
-    if (keyList) {
-      let results = [];
-      keyList.forEach(key => {
-        let id = fullKeyValueListOfTextToIDs.items
-          ? fullKeyValueListOfTextToIDs.items[key]
-          : fullKeyValueListOfTextToIDs[key];
-        if (id) results.push(id);
-      });
-      return { results: results };
+  getETag(listItem) {
+    if (listItem && listItem.__metadata) return listItem.__metadata.etag;
+    else return null;
+  }
+
+  /*
+    Cast date string as a date object
+    Or return null if it can't be converted to a date object
+  */
+  castAsDate(dateValue) {
+    if (dateValue) {
+      let d = new Date(dateValue);
+      if (isNaN(d) == false) return d;
+      else return null;
     } else return null;
+  }
+
+  /*
+    Utility methods for preparing data for update and add methods
+  */
+  getMatchingIDs(allTextAndIDs, keys) {
+    let IDs = [];
+    keys.forEach(key => {
+      let id = allTextAndIDs[key];
+      if (id > 0) IDs.push(id);
+    });
+    return IDs;
+  }
+  castToDateData(d) {
+    if (d && typeof d == "object" && typeof d.toISOString == "function")
+      return d.toISOString();
+    else return null;
+  }
+  castToMultiValueData(list) {
+    if (Array.isArray(list))
+      return {
+        results: list
+      };
+    else
+      return {
+        results: []
+      };
   }
 
   /*
@@ -492,20 +514,17 @@ class SharePoint {
         Title (rank)
       }
  */
-  retrievePeopleProfile({accountName, email=null, property=null}) {
+  retrievePeopleProfile({ accountName, email = null, property = null }) {
     let me = this;
     return new Promise((resolve, reject) => {
       if (me.inProduction) {
-        let accountName = accountName;
-        if (!accountName && email)
-          accountName = config.accountNamePrefix + email;
-        if (accountName) {
+        let account = accountName;
+        if (!account && email) account = config.accountNamePrefix + email;
+        if (account) {
           axios
             .get(
               config.peopleManagerbaseUrl +
-                "'" +
-                escape(accountName) +
-                "'" +
+                `'${escape(account)}'` +
                 (property
                   ? "&$select=" + property
                   : "&$select=" + config.profileDefaultSelect),
@@ -526,7 +545,7 @@ class SharePoint {
               reject(error);
             });
         } else reject("No account name provided");
-      } else 
+      } else
         setTimeout(function() {
           resolve({
             DisplayName: "TEST NAME",
@@ -572,7 +591,7 @@ class SharePoint {
           .catch(function(error) {
             reject(error);
           });
-      else 
+      else
         setTimeout(function() {
           resolve({
             DisplayName: "CURRENT USER"
@@ -585,7 +604,7 @@ class SharePoint {
     Pass their ID to the resolve handler.
         accountName: i:0#.f|membership|name@domain,
   */
-  ensureSiteUserId(accountName) {
+  ensureSiteUserId({ accountName }) {
     let me = this;
     return new Promise((resolve, reject) => {
       if (me.inProduction)
@@ -616,52 +635,56 @@ class SharePoint {
     });
   }
   /*
-    Send email using the SharePoint server
-        from: "",
-        to: [],
-        subject: "",
-        bodyHtml: "",
+    Send email using the SharePoint server.
+    Recipients must be existing users in the SharePoint environment.
+      from: "your.name@domain.com",
+      to: ["recipient1@domain.com", "recipient2@domain.com"],
+      subject: "Email subject",
+      body: "",
   */
-  sendEmail({ from, to, subject, bodyHtml }) {
+  sendEmail({ from, to, subject, body }) {
     let me = this;
     return new Promise((resolve, reject) => {
-      let mailData = {
-        properties: {
-          __metadata: {
-            type: "SP.Utilities.EmailProperties"
-          },
-          From: from,
-          To: {
-            results: to
-          },
-          Subject: subject,
-          Body: bodyHtml
+      if (from && to && subject) {
+        let toArray = Array.isArray(to) ? to : [to];
+        let mailData = {
+          properties: {
+            __metadata: {
+              type: "SP.Utilities.EmailProperties"
+            },
+            From: from,
+            To: {
+              results: toArray
+            },
+            Subject: subject,
+            Body: body
+          }
+        };
+        if (me.inProduction)
+          axios
+            .post(me.baseUrl + config.sendEmailPath, mailData, {
+              withCredentials: true,
+              headers: {
+                Accept: "application/json;odata=verbose",
+                "Content-Type": "application/json;odata=verbose",
+                "X-RequestDigest": me.digestValue,
+                "X-HTTP-Method": "POST"
+              }
+            })
+            .then(function(response) {
+              resolve(response);
+            })
+            .catch(function(error) {
+              reject(error);
+            });
+        else {
+          me.log(`Send email to: ${to}`);
+          me.log(`From: ${from}`);
+          me.log(`Subject: ${subject}`);
+          me.log(`Body: ${body}`);
+          resolve();
         }
-      };
-      if (me.inProduction)
-        axios
-          .post(me.baseUrl + config.sendEmailPath, mailData, {
-            withCredentials: true,
-            headers: {
-              Accept: "application/json;odata=verbose",
-              "Content-Type": "application/json;odata=verbose",
-              "X-RequestDigest": me.digestValue,
-              "X-HTTP-Method": "POST"
-            }
-          })
-          .then(function(response) {
-            resolve(response);
-          })
-          .catch(function(error) {
-            reject(error);
-          });
-      else {
-        me.log(`Send email to: ${to}`);
-        me.log(`From: ${from}`);
-        me.log(`Subject: ${subject}`);
-        me.log(`Body: ${bodyHtml}`);
-        resolve();
-      }
+      } else reject("From, To or Subject not provided.");
     });
   }
 
@@ -670,8 +693,8 @@ class SharePoint {
       console.log(message);
   }
 
-  getListItemType(name) {
-    name = name.replace(/\s/gi, "_x0020_");
+  getListItemType(listName) {
+    let name = listName.replace(/\s/gi, "_x0020_");
     return `SP.Data.${name[0].toUpperCase() + name.substring(1)}ListItem`;
   }
 }
