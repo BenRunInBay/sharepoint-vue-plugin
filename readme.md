@@ -25,7 +25,7 @@ Most methods return a Promise.
 ## Vue main.js entry:
 ```javascript
 import 'sharepoint-vue-plugin'
-// specify path to the SharePoint site are using this within
+// specify path to the SharePoint site that you are using this within
 Vue.use(SharePoint, '/sites/MySite/')
 ````
 ## Using it
