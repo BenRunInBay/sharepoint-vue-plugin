@@ -1,6 +1,6 @@
 {
   "name": "sharepoint-vue-plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Access SharePoint REST API through Vue components.",
   "main": "index.js",
   "scripts": {
@@ -14,5 +14,9 @@
   "license": "MIT",
   "dependencies": {
     "axios": "^0.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BenRunInBay/sharepoint-vue-plugin.git"
   }
 }

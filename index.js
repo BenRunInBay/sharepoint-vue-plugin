@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-03-06
+    Last updated 2019-03-11
 
     Vue main.js entry:
         import SharePoint from '@/lib/SharePoint'
@@ -411,11 +411,11 @@ class SharePoint {
 
   /*
     Get ODATA-formatted OR query to retrieve matching optionsArray values
-      query = getQueryFilter(["Americas", "EMEIA"], "Area")
+      query = orQueryFromArray(["Americas", "EMEIA"], "Area")
       returns: (Area eq 'Americas' or Area eq 'EMEIA')
   */
   orQueryFromArray(optionsArray, fieldName) {
-    if (Array.isArray(optionsArray) && fieldName) {
+    if (Array.isArray(optionsArray) && optionsArray.length && fieldName) {
       let searchPattern = "";
       optionsArray.forEach(compare => {
         if (compare) {
@@ -429,11 +429,11 @@ class SharePoint {
   }
   /*
     Get ODATA-formatted AND query to retrieve matching optionsArray values
-      query = getQueryFilter(["Americas", "EMEIA"], "Area")
+      query = andQueryFromArray(["Americas", "EMEIA"], "Area")
       returns: (Area eq 'Americas' and Area eq 'EMEIA')
   */
   andQueryFromArray(optionsArray, fieldName) {
-    if (Array.isArray(optionsArray) && fieldName) {
+    if (Array.isArray(optionsArray) && optionsArray.length && fieldName) {
       let searchPattern = "";
       optionsArray.forEach(compare => {
         if (compare) {
