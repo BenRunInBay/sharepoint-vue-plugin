@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-03-11
+    Last updated 2019-03-12
 
     Vue main.js entry:
         import SharePoint from '@/lib/SharePoint'
@@ -37,14 +37,13 @@ let baseConfig = {
     myProfileDefaultSelect:
       "DisplayName,AccountName,Email,PictureUrl,PersonalUrl,Title",
     listPath: "_api/Web/Lists/",
-    currentUserPropertiesPrefix:
-      "/_api/sp.userprofiles.peoplemanager/getmyproperties/?$select=",
-    peopleManagerbaseUrl:
-      "/_api/sp.userprofiles.peoplemanager/GetPropertiesFor(accountName=@v)?@v=",
-    siteUserPrefix: "_api/web/siteusers(@v)?@v='",
-    ensureUserUrl: "_api/web/ensureuser",
+    currentUserPropertiesPathPrefix:
+      "_api/sp.userprofiles.peoplemanager/getmyproperties/?$select=",
+    peopleManagerPathPrefix:
+      "_api/sp.userprofiles.peoplemanager/GetPropertiesFor(accountName=@v)?@v=",
+    ensureUserPathPrefix: "_api/web/ensureuser",
+    sendEmailPathPrefix: "_api/SP.Utilities.Utility.SendEmail",
     accountNamePrefix: "i:0#.f|membership|",
-    sendEmailPath: "_api/SP.Utilities.Utility.SendEmail",
     formDigestRefreshInterval: 19 * 60 * 1000
   },
   config = baseConfig;
@@ -523,7 +522,7 @@ class SharePoint {
         if (account) {
           axios
             .get(
-              config.peopleManagerbaseUrl +
+              this.getAPIUrl(config.peopleManagerPathPrefix) +
                 `'${escape(account)}'` +
                 (property
                   ? "&$select=" + property
@@ -574,7 +573,7 @@ class SharePoint {
       if (me.inProduction)
         axios
           .get(
-            config.currentUserPropertiesPrefix + config.myProfileDefaultSelect,
+            this.getAPIUrl(config.currentUserPropertiesPathPrefix) + config.myProfileDefaultSelect,
             {
               cache: false,
               withCredentials: true,
@@ -610,7 +609,7 @@ class SharePoint {
       if (me.inProduction)
         axios
           .post(
-            me.baseUrl + config.ensureUserUrl,
+            this.getAPIUrl(config.ensureUserPathPrefix),
             {
               logonName: accountName
             },
@@ -662,7 +661,7 @@ class SharePoint {
         };
         if (me.inProduction)
           axios
-            .post(me.baseUrl + config.sendEmailPath, mailData, {
+            .post(this.getAPIUrl(config.sendEmailPathPrefix), mailData, {
               withCredentials: true,
               headers: {
                 Accept: "application/json;odata=verbose",
@@ -696,5 +695,13 @@ class SharePoint {
   getListItemType(listName) {
     let name = listName.replace(/\s/gi, "_x0020_");
     return `SP.Data.${name[0].toUpperCase() + name.substring(1)}ListItem`;
+  }
+
+  getAPIUrl(path) {
+    if (path) {
+      if (path.indexOf("/") == 0) return path;
+      else if (path.indexOf("http")==0) return path;
+      else return this.baseUrl + path;
+    } else return null;
   }
 }
