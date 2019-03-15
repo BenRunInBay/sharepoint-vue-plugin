@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-03-12
+    Last updated 2019-03-15
 
     Vue main.js entry:
         import SharePoint from '@/lib/SharePoint'
@@ -411,13 +411,19 @@ class SharePoint {
   /*
     Get ODATA-formatted OR query to retrieve matching optionsArray values
       query = orQueryFromArray(["Americas", "EMEIA"], "Area")
-      returns: (Area eq 'Americas' or Area eq 'EMEIA')
+        returns: (Area eq 'Americas' or Area eq 'EMEIA')
+      query = orQueryFromArray([5, 10, 12], "Sort")
+        returns: (Sort eq 5 or Sort eq 10 or Sort eq 12)
   */
   orQueryFromArray(optionsArray, fieldName) {
     if (Array.isArray(optionsArray) && optionsArray.length && fieldName) {
       let searchPattern = "";
       optionsArray.forEach(compare => {
-        if (compare) {
+        if (compare && typeof(compare)=="number") {
+          searchPattern +=
+            (searchPattern.length ? " or " : "") +
+            `${fieldName} eq ${encodeURIComponent(compare)}`;
+        } else if (compare && typeof(compare)=="string") {
           searchPattern +=
             (searchPattern.length ? " or " : "") +
             `${fieldName} eq '${encodeURIComponent(compare)}'`;
@@ -435,7 +441,11 @@ class SharePoint {
     if (Array.isArray(optionsArray) && optionsArray.length && fieldName) {
       let searchPattern = "";
       optionsArray.forEach(compare => {
-        if (compare) {
+        if (compare && typeof(compare)=="number") {
+          searchPattern +=
+            (searchPattern.length ? " and " : "") +
+            `${fieldName} eq ${encodeURIComponent(compare)}`;
+        } else if (compare && typeof(compare)=="string") {
           searchPattern +=
             (searchPattern.length ? " and " : "") +
             `${fieldName} eq '${encodeURIComponent(compare)}'`;
