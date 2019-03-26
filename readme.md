@@ -1,6 +1,9 @@
 # SharePoint Vue Plug-in
-### Last updated 2019-03-06
+### Last updated 2019-03-26
 ### NOT RELEASED, UNDER DEVELOPMENT
+
+## Presentation about using Vue in SharePoint
+[Vue in SharePoint](https://1drv.ms/p/s!AjelfXJUND_KgrATrHzrTwwRoG2X2A)
 
 ## Purpose
 This is a compact Vue plug-in for accessing SharePoint REST API to perform list/library CRUD operations, identifying current user, getting profile data of other users in the system, and sending emails through the SharePoint site. It does NOT require any other SharePoint client libraries. You can install this in your vue-cli 3 webpack-built application and use it independently.
