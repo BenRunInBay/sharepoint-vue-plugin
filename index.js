@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-03-15
+    Last updated 2019-05-01
 
     Vue main.js entry:
         import SharePoint from '@/lib/SharePoint'
@@ -419,11 +419,11 @@ class SharePoint {
     if (Array.isArray(optionsArray) && optionsArray.length && fieldName) {
       let searchPattern = "";
       optionsArray.forEach(compare => {
-        if (compare && typeof(compare)=="number") {
+        if (compare && typeof compare == "number") {
           searchPattern +=
             (searchPattern.length ? " or " : "") +
             `${fieldName} eq ${encodeURIComponent(compare)}`;
-        } else if (compare && typeof(compare)=="string") {
+        } else if (compare && typeof compare == "string") {
           searchPattern +=
             (searchPattern.length ? " or " : "") +
             `${fieldName} eq '${encodeURIComponent(compare)}'`;
@@ -441,11 +441,11 @@ class SharePoint {
     if (Array.isArray(optionsArray) && optionsArray.length && fieldName) {
       let searchPattern = "";
       optionsArray.forEach(compare => {
-        if (compare && typeof(compare)=="number") {
+        if (compare && typeof compare == "number") {
           searchPattern +=
             (searchPattern.length ? " and " : "") +
             `${fieldName} eq ${encodeURIComponent(compare)}`;
-        } else if (compare && typeof(compare)=="string") {
+        } else if (compare && typeof compare == "string") {
           searchPattern +=
             (searchPattern.length ? " and " : "") +
             `${fieldName} eq '${encodeURIComponent(compare)}'`;
@@ -583,7 +583,8 @@ class SharePoint {
       if (me.inProduction)
         axios
           .get(
-            this.getAPIUrl(config.currentUserPropertiesPathPrefix) + config.myProfileDefaultSelect,
+            this.getAPIUrl(config.currentUserPropertiesPathPrefix) +
+              config.myProfileDefaultSelect,
             {
               cache: false,
               withCredentials: true,
@@ -698,19 +699,27 @@ class SharePoint {
   }
 
   log(message) {
+    const ErrorLogger =
+      typeof window == "object" && typeof window.logger == "object"
+        ? window.logger
+        : {
+            log(message) {
+              console.log(message);
+            }
+          };
     if (!this.inProduction && config.showConsoleActivityInDev)
-      console.log(message);
+      ErrorLogger.log(message);
   }
 
   getListItemType(listName) {
-    let name = listName.replace(/\s/gi, "_x0020_");
+    let name = listName.replace(/\s/gi, "_x0020_").replace("-", "");
     return `SP.Data.${name[0].toUpperCase() + name.substring(1)}ListItem`;
   }
 
   getAPIUrl(path) {
     if (path) {
       if (path.indexOf("/") == 0) return path;
-      else if (path.indexOf("http")==0) return path;
+      else if (path.indexOf("http") == 0) return path;
       else return this.baseUrl + path;
     } else return null;
   }
