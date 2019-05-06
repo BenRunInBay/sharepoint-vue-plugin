@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-05-01
+    Last updated 2019-05-06
 
     Vue main.js entry:
         import SharePoint from '@/lib/SharePoint'
@@ -712,7 +712,7 @@ class SharePoint {
   }
 
   getListItemType(listName) {
-    let name = listName.replace(/\s/gi, "_x0020_").replace("-", "");
+    let name = listName.replace(/\s/gi, "_x0020_");
     return `SP.Data.${name[0].toUpperCase() + name.substring(1)}ListItem`;
   }
 
