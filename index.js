@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-05-06
+    Last updated 2019-05-06b
 
     Vue main.js entry:
         import SharePoint from '@/lib/SharePoint'
@@ -25,13 +25,13 @@
 /* Comment out the following line if not using this in a webpack build system: */
 import axios from "axios";
 
-// artificial delay when working in Dev mode
-const constDevLoadDelay = 1000;
-
 /* Modify these default configurations for your SharePoint environment */
 let baseConfig = {
     productionHosts: ["yoursite.sharepoint.com"],
     showConsoleActivityInDev: true,
+    devLoadDelay: 1000,
+    devLoadDelayMin: null,
+    devLoadDelayMax: null,
     profileDefaultSelect:
       "AccountName,DisplayName,Email,PictureUrl,PersonalUrl,Title,UserProfileProperties",
     myProfileDefaultSelect:
@@ -151,7 +151,7 @@ class SharePoint {
           devStaticDataUrl: url of local JSON file to use for testing/development
         Returns Promise
   */
-  _get({ baseUrl, path, url, devStaticDataUrl }) {
+  get({ baseUrl, path, url, devStaticDataUrl }) {
     let me = this;
     return new Promise((resolve, reject) => {
       if (me.inProduction) {
@@ -179,7 +179,11 @@ class SharePoint {
         axios
           .get(devStaticDataUrl, {})
           .then(response => {
-            if (response) resolve(response.data);
+            if (response) {
+              artificialDevDelay(() => {
+                resolve(response.data);
+              });
+            }
           })
           .catch(error => {
             reject(error);
@@ -219,7 +223,7 @@ class SharePoint {
       if (select) q.push("$select=" + select);
       if (expand) q.push("$expand=" + expand);
       if (filter) q.push("$filter=" + filter);
-      me._get({
+      me.get({
         baseUrl: baseUrl,
         path: `${config.listPath}getbytitle('${listName}')/items?${q.join(
           "&"
@@ -237,7 +241,7 @@ class SharePoint {
   /*
       Post data
   */
-  _post({ path, url, data }) {
+  post({ path, url, data }) {
     let me = this;
     return new Promise((resolve, reject) => {
       if (path && data) {
@@ -287,7 +291,7 @@ class SharePoint {
           ),
           path = config.listPath + `getbytitle('${listName}')/items`;
         me.log(addData);
-        me._post({ path: path, data: addData })
+        me.post({ path: path, data: addData })
           .then(responseData => {
             resolve(responseData);
           })
@@ -309,7 +313,7 @@ class SharePoint {
           resolve(itemData);
         } else {
           // obtain updated etag
-          me._get({
+          me.get({
             url: itemUrl + "?$select=ID"
           })
             .then(data => {
@@ -388,7 +392,7 @@ class SharePoint {
     let me = this;
     return new Promise((resolve, reject) => {
       if (listName && queryXml) {
-        me._post({
+        me.post({
           path: `${config.listPath}getbytitle('${listName}')/getitems`,
           data: {
             query: {
@@ -554,15 +558,16 @@ class SharePoint {
               reject(error);
             });
         } else reject("No account name provided");
-      } else
-        setTimeout(function() {
+      } else {
+        artificialDevDelay(() => {
           resolve({
             DisplayName: "TEST NAME",
             Email: "test@ey.com",
             PersonalUrl: "",
             Title: "Staff"
           });
-        }, constDevLoadDelay);
+        });
+      }
     });
   }
   /*
@@ -601,12 +606,13 @@ class SharePoint {
           .catch(function(error) {
             reject(error);
           });
-      else
-        setTimeout(function() {
+      else {
+        artificialDevDelay(() => {
           resolve({
             DisplayName: "CURRENT USER"
           });
-        }, constDevLoadDelay);
+        });
+      }
     });
   }
   /*
@@ -699,14 +705,6 @@ class SharePoint {
   }
 
   log(message) {
-    const ErrorLogger =
-      typeof window == "object" && typeof window.logger == "object"
-        ? window.logger
-        : {
-            log(message) {
-              console.log(message);
-            }
-          };
     if (!this.inProduction && config.showConsoleActivityInDev)
       ErrorLogger.log(message);
   }
@@ -724,3 +722,23 @@ class SharePoint {
     } else return null;
   }
 }
+
+function artificialDevDelay(fn) {
+  if (config.devLoadDelayMin && config.devLoadDelayMax) {
+    let span = Math.max(1, config.devLoadDelayMax - config.devLoadDelayMin),
+      delay = Math.round(Math.random() * span + config.devLoadDelayMin);
+    setTimeout(fn, delay);
+  } else if (config.devLoadDelay) {
+    setTimeout(fn, config.devLoadDelay);
+  } else fn.call();
+}
+
+/* error logger */
+const ErrorLogger =
+  typeof window == "object" && typeof window.logger == "object"
+    ? window.logger
+    : {
+        log(message) {
+          console.log(message);
+        }
+      };
