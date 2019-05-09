@@ -2,10 +2,14 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-05-06b
+    Last updated 2019-05-09
+
+    Copy into:
+      /src/plugins/SharePoint-vue-plugin
 
     Vue main.js entry:
-        import SharePoint from '@/lib/SharePoint'
+        import SharePoint from '@/plugins/SharePoint-vue-plugin'
+
         Vue.use(SharePoint, '/sites/MySite/', {
           productionHosts: ["myhost.sharepoint.com"]
         })
@@ -25,7 +29,14 @@
 /* Comment out the following line if not using this in a webpack build system: */
 import axios from "axios";
 
-/* Modify these default configurations for your SharePoint environment */
+/*
+  Modify these default configurations for your SharePoint environment,
+  or, set specific ones when "using" the plugin. For example:
+    Vue.use(SharePoint, '/sites/MySite/', {
+        productionHosts: ["myhost.sharepoint.com"],
+        profileDefaultSelect: "AccountName,DisplayName,Email,PictureUrl"
+      })
+*/
 let baseConfig = {
     productionHosts: ["yoursite.sharepoint.com"],
     showConsoleActivityInDev: true,
@@ -148,6 +159,7 @@ class SharePoint {
       Get data
           baseUrl: (optional)
           path: (after baseUrl),
+          url: URL instead of combining baseUrl and path
           devStaticDataUrl: url of local JSON file to use for testing/development
         Returns Promise
   */
