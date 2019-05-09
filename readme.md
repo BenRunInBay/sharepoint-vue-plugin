@@ -2,14 +2,16 @@
 
 ### Last updated 2019-05-09
 
+Note: instructions and comments are incomplete.
+
 ## Purpose
 
-This is a compact Vue plug-in for accessing SharePoint REST API to perform list/library CRUD operations, identifying current user, getting profile data of other users in the system, and sending emails through the SharePoint site. It does NOT require any other SharePoint client libraries. You can install this in your vue-cli 3 webpack-built application and use it independently.
+This is a compact Vue plug-in for accessing the SharePoint REST API to perform list/library CRUD operations, identifying current user, getting profile data of other users in the system, and sending emails through the SharePoint site. It does NOT require any other SharePoint client libraries. You can install this in your vue-cli 3 webpack-built application and use it independently.
 
 This custom Vue plug minifies to about 16k and is accessible within Vue components as:
 
 ```
-this.$sp.
+this.$sp
 ```
 
 ### Alternatives
@@ -33,6 +35,7 @@ src/plugins/sharepoint-vue-plugin
 import SharePoint from "./plugins/sharepoint-vue-plugin";
 // specify path to the SharePoint site that you are using this within
 Vue.use(SharePoint, "/sites/MySite/", {
+  // specify the production domain of your SharePoint environment
   productionHosts: ["myhost.sharepoint.com"]
 });
 ```
