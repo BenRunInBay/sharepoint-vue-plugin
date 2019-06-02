@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-05-09
+    Last updated 2019-06-02
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -258,7 +258,8 @@ class SharePoint {
     return new Promise((resolve, reject) => {
       if (path && data) {
         if (!me.inProduction) {
-          me.log("Post to SharePoint: " + JSON.stringify(data));
+          me.log("Post to SharePoint: ");
+          me.log(data);
           resolve(data, "dev item url");
         } else {
           let postUrl = url ? url : me.baseUrl + path;
@@ -302,7 +303,6 @@ class SharePoint {
             itemData
           ),
           path = config.listPath + `getbytitle('${listName}')/items`;
-        me.log(addData);
         me.post({ path: path, data: addData })
           .then(responseData => {
             resolve(responseData);
