@@ -1,8 +1,6 @@
 # SharePoint Vue Plug-in
 
-### Last updated 2019-05-09
-
-Note: instructions and comments are incomplete.
+### Last updated 2019-06-02
 
 ## Purpose
 
