@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-06-02
+    Last updated 2019-06-03
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -653,7 +653,8 @@ class SharePoint {
           )
           .then(function(response) {
             if (response && response.data) {
-              resolve(response.data.Id);
+              if (response.data.d) resolve(response.data.d.Id);
+              else resolve(response.data.Id);
             }
           })
           .catch(function(error) {
