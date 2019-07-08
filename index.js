@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-06-24
+    Last updated 2019-07-08
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -331,6 +331,8 @@ class SharePoint {
             .then(data => {
               let etag = me.getETag(data);
               if (etag) {
+                // fix etag
+                etag = etag.replace(/{|}/g, "").toLowerCase();
                 let updateData = Object.assign(
                   {
                     __metadata: {
