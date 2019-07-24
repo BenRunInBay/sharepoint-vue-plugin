@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-07-08
+    Last updated 2019-07-23
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -433,18 +433,19 @@ class SharePoint {
       query = orQueryFromArray([5, 10, 12], "Sort")
         returns: (Sort eq 5 or Sort eq 10 or Sort eq 12)
   */
-  orQueryFromArray(optionsArray, fieldName) {
+  orQueryFromArray(optionsArray, fieldName, operator) {
+    if (!operator) operator = "eq";
     if (Array.isArray(optionsArray) && optionsArray.length && fieldName) {
       let searchPattern = "";
       optionsArray.forEach(compare => {
         if (compare && typeof compare == "number") {
           searchPattern +=
             (searchPattern.length ? " or " : "") +
-            `${fieldName} eq ${encodeURIComponent(compare)}`;
+            `${fieldName} ${operator} ${compare}`;
         } else if (compare && typeof compare == "string") {
           searchPattern +=
             (searchPattern.length ? " or " : "") +
-            `${fieldName} eq '${encodeURIComponent(compare)}'`;
+            `${fieldName} ${operator} '${encodeURIComponent(compare)}'`;
         }
       });
       return "(" + searchPattern + ")";
@@ -455,18 +456,19 @@ class SharePoint {
       query = andQueryFromArray(["Americas", "EMEIA"], "Area")
       returns: (Area eq 'Americas' and Area eq 'EMEIA')
   */
-  andQueryFromArray(optionsArray, fieldName) {
+  andQueryFromArray(optionsArray, fieldName, operator) {
+    if (!operator) operator = "eq";
     if (Array.isArray(optionsArray) && optionsArray.length && fieldName) {
       let searchPattern = "";
       optionsArray.forEach(compare => {
         if (compare && typeof compare == "number") {
           searchPattern +=
             (searchPattern.length ? " and " : "") +
-            `${fieldName} eq ${encodeURIComponent(compare)}`;
+            `${fieldName} ${operator} ${compare}`;
         } else if (compare && typeof compare == "string") {
           searchPattern +=
             (searchPattern.length ? " and " : "") +
-            `${fieldName} eq '${encodeURIComponent(compare)}'`;
+            `${fieldName} ${operator} '${encodeURIComponent(compare)}'`;
         }
       });
       return "(" + searchPattern + ")";
