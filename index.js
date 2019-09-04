@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-07-23
+    Last updated 2019-09-03
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -71,6 +71,11 @@ export default {
     config = Object.assign(baseConfig, configUpdates);
     let sp = new SharePoint(baseUrl);
     Object.defineProperty(Vue.prototype, "$sp", { value: sp });
+  },
+
+  create(baseUrl, configUpdates) {
+    config = Object.assign(baseConfig, configUpdates);
+    return new SharePoint(baseUrl);
   }
 };
 
