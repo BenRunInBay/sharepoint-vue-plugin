@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-09-03
+    Last updated 2019-09-17
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -55,9 +55,13 @@ let baseConfig = {
     ensureUserPathPrefix: "_api/web/ensureuser",
     sendEmailPathPrefix: "_api/SP.Utilities.Utility.SendEmail",
     accountNamePrefix: "i:0#.f|membership|",
-    formDigestRefreshInterval: 19 * 60 * 1000
+    formDigestRefreshInterval: 19 * 60 * 1000,
+    formDigestMaxRefreshes: 5
   },
-  config = baseConfig;
+  config = baseConfig,
+  pvt = {
+    formDigestRefreshCount: 0
+  };
 
 /*
     Vue installer
@@ -111,12 +115,16 @@ class SharePoint {
   */
   getFormDigest() {
     let me = this;
-    setInterval(() => {
-      me.getFormDigest().catch(error => {
-        return;
-      });
-      me.log("Refreshed digest value");
-    }, config.formDigestRefreshInterval);
+    if (pvt.formDigestRefreshCount < config.formDigestMaxRefreshes) {
+      setTimeout(() => {
+        me.getFormDigest().catch(error => {
+          return;
+        });
+        me.log("Refreshed digest value");
+      }, config.formDigestRefreshInterval);
+      pvt.formDigestRefreshCount++;
+    }
+
     return new Promise((resolve, reject) => {
       if (!me.inProduction) {
         me.digestValue = "dev digest value";
