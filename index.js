@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-09-17
+    Last updated 2019-09-25
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -218,6 +218,7 @@ class SharePoint {
       }
     });
   }
+
   /*
       Get data from a list
           baseUrl: <optional url>,
@@ -263,6 +264,7 @@ class SharePoint {
         });
     });
   }
+
   /*
       Post data
   */
@@ -304,6 +306,53 @@ class SharePoint {
       } else reject("No path or data provided");
     });
   }
+
+  /* 
+    Convert the object into a data object suitable for posting back to SharePoint
+    sourceData = {
+      ExampleString: "string value",
+      ExampleNumber: 5,
+      ExampleBoolean: true,
+      ExampleDate: new Date(2019, 09, 24),
+      ExampleLookup: { ID: 3, Title: "Item 3" },
+      ExampleMultiLookup: [ 7, 12, 15 ],
+      ExampleNull: null
+    }
+    returned payload = {
+      ExampleString: "string value",
+      ExampleNumber: 5,
+      ExampleBoolean: 1,
+      ExampleDate: "2019-09-24T00:00:00.000Z",
+      ExampleLookupId: 3,
+      ExampleMultiLookupId: { results: [ 7, 12, 15 ] },
+      [ExampleNull excluded from payload]
+    }
+  */
+  castToPayload(sourceData) {
+    let payload = {};
+    if (typeof sourceData == "object") {
+      for (let k in sourceData) {
+        let o = sourceData[k];
+        if (typeof o == "string") payload[k] = o;
+        else if (typeof o == "number") payload[k] = o;
+        else if (typeof o == "boolean") payload[k] = o ? true : false;
+        else if (typeof o == "object") {
+          if (o == null);
+          else if (typeof o.getDate == "function")
+            payload[k] = this.castToDateData(o);
+          else if (o.ID)
+            // assume look-up field
+            payload[k + "Id"] = o.ID;
+          // assume multi-value look-up
+          else if (Array.isArray(o))
+            payload[k + "Id"] = this.castToMultiValueData(o);
+          // assume date
+        }
+      }
+    }
+    return payload;
+  }
+
   /*
       Write data to a list, appending it as a new item
   */
