@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-09-25
+    Last updated 2019-12-23
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -26,12 +26,13 @@
           })
         }
 */
-/* Comment out the following line if not using this in a webpack build system: */
+/* Comment out the following line if not using in a module builder such as webpack: */
 import axios from "axios";
 
 /*
-  Modify these default configurations for your SharePoint environment,
-  or, set specific ones when "using" the plugin. For example:
+  Default configurations for SharePoint environment
+  Override when installing the plug in.
+  For example:
     Vue.use(SharePoint, '/sites/MySite/', {
         productionHosts: ["myhost.sharepoint.com"],
         profileDefaultSelect: "AccountName,DisplayName,Email,PictureUrl"
@@ -66,9 +67,12 @@ let baseConfig = {
 /*
     Vue installer
 
-    Vue.use(SharePoint, "/sites/MySite/", {
-        productionHosts: ["production.com"]
-    })
+    Vue.use(SharePoint, baseUrl, configUpdates)
+
+    For example:
+      Vue.use(SharePoint, "/sites/MySite/", {
+          productionHosts: ["production.com"]
+      })
 */
 export default {
   install(Vue, baseUrl, configUpdates) {
@@ -83,12 +87,15 @@ export default {
   }
 };
 
+/*
+  SharePoint plug in class definition
+*/
 class SharePoint {
   constructor(baseUrl) {
-    // properties
-    this.baseUrl = baseUrl;
-    this.digestValue = null;
-    this.inProduction = false;
+    // private properties
+    this._baseUrl = baseUrl;
+    this._digestValue = null;
+    this._inProduction = false;
 
     if (!baseUrl) {
       // guess at base URL
@@ -97,13 +104,14 @@ class SharePoint {
             ? location.pathname.match(/^\/\w+\/\w+\//g)
             : null,
         path = paths && paths.length ? paths[0] : null;
-      this.baseUrl = path;
+      this._baseUrl = path;
     }
 
+    // determine if app is in production
     if (Array.isArray(config.productionHosts))
       config.productionHosts.forEach(host => {
-        this.inProduction =
-          this.inProduction || location.href.indexOf(host) >= 0;
+        this._inProduction =
+          this._inProduction || location.href.indexOf(host) >= 0;
       });
   }
 
@@ -120,7 +128,7 @@ class SharePoint {
         me.getFormDigest().catch(error => {
           return;
         });
-        me.log("Refreshed digest value");
+        me._log("Refreshed digest value");
       }, config.formDigestRefreshInterval);
       pvt.formDigestRefreshCount++;
     }
@@ -163,8 +171,8 @@ class SharePoint {
   /* True if request digest is known */
   isWriteReady() {
     return (
-      (this.inProduction && this.digestValue != null) ||
-      this.inProduction == false
+      (this._inProduction && this._digestValue != null) ||
+      this._inProduction == false
     );
   }
 
@@ -205,7 +213,7 @@ class SharePoint {
           .get(devStaticDataUrl, {})
           .then(response => {
             if (response) {
-              artificialDevDelay(() => {
+              _artificialDevDelay(() => {
                 resolve(response.data);
               });
             }
@@ -273,8 +281,8 @@ class SharePoint {
     return new Promise((resolve, reject) => {
       if (path && data) {
         if (!me.inProduction) {
-          me.log("Post to SharePoint: ");
-          me.log(data);
+          me._log("Post to SharePoint: ");
+          me._log(data);
           resolve(data, "dev item url");
         } else {
           let postUrl = url ? url : me.baseUrl + path;
@@ -361,7 +369,7 @@ class SharePoint {
     return new Promise((resolve, reject) => {
       if (listName && itemData) {
         let addData = Object.assign(
-            { __metadata: { type: me.getListItemType(listName) } },
+            { __metadata: { type: me._getListItemType(listName) } },
             itemData
           ),
           path = config.listPath + `getbytitle('${listName}')/items`;
@@ -398,7 +406,7 @@ class SharePoint {
                 let updateData = Object.assign(
                   {
                     __metadata: {
-                      type: me.getListItemType(listName)
+                      type: me._getListItemType(listName)
                     }
                   },
                   itemData
@@ -438,7 +446,7 @@ class SharePoint {
     return new Promise((resolve, reject) => {
       if (itemUrl) {
         if (!me.inProduction) {
-          me.log("Delete item in SharePoint: " + JSON.stringify(itemUrl));
+          me._log("Delete item in SharePoint: " + JSON.stringify(itemUrl));
           resolve();
         } else {
           axios
@@ -553,18 +561,6 @@ class SharePoint {
   }
 
   /*
-    Cast date string as a date object
-    Or return null if it can't be converted to a date object
-  */
-  castAsDate(dateValue) {
-    if (dateValue) {
-      let d = new Date(dateValue);
-      if (isNaN(d) == false) return d;
-      else return null;
-    } else return null;
-  }
-
-  /*
     Utility methods for preparing data for update and add methods
   */
   getMatchingIDs(allTextAndIDs, keys) {
@@ -574,6 +570,18 @@ class SharePoint {
       if (id > 0) IDs.push(id);
     });
     return IDs;
+  }
+
+  /*
+    Cast date string as a date object
+    Or return null if it can't be converted to a date object
+  */
+  castAsDate(dateValue) {
+    if (dateValue) {
+      let d = new Date(dateValue);
+      if (isNaN(d) == false) return d;
+      else return null;
+    } else return null;
   }
   castToDateData(d) {
     if (d && typeof d == "object" && typeof d.toISOString == "function")
@@ -614,7 +622,7 @@ class SharePoint {
         if (account) {
           axios
             .get(
-              this.getAPIUrl(config.peopleManagerPathPrefix) +
+              this._getAPIUrl(config.peopleManagerPathPrefix) +
                 `'${escape(account)}'` +
                 (property
                   ? "&$select=" + property
@@ -637,7 +645,7 @@ class SharePoint {
             });
         } else reject("No account name provided");
       } else {
-        artificialDevDelay(() => {
+        _artificialDevDelay(() => {
           resolve({
             DisplayName: "TEST NAME",
             Email: "test@ey.com",
@@ -666,7 +674,7 @@ class SharePoint {
       if (me.inProduction)
         axios
           .get(
-            this.getAPIUrl(config.currentUserPropertiesPathPrefix) +
+            this._getAPIUrl(config.currentUserPropertiesPathPrefix) +
               config.myProfileDefaultSelect,
             {
               cache: false,
@@ -685,7 +693,7 @@ class SharePoint {
             reject(error);
           });
       else {
-        artificialDevDelay(() => {
+        _artificialDevDelay(() => {
           resolve({
             DisplayName: "CURRENT USER"
           });
@@ -704,9 +712,9 @@ class SharePoint {
       if (me.inProduction)
         axios
           .post(
-            this.getAPIUrl(config.ensureUserPathPrefix),
+            this._getAPIUrl(config.ensureUserPathPrefix),
             {
-              logonName: accountName
+              _logonName: accountName
             },
             {
               cache: false,
@@ -757,7 +765,7 @@ class SharePoint {
         };
         if (me.inProduction)
           axios
-            .post(this.getAPIUrl(config.sendEmailPathPrefix), mailData, {
+            .post(this._getAPIUrl(config.sendEmailPathPrefix), mailData, {
               withCredentials: true,
               headers: {
                 Accept: "application/json;odata=verbose",
@@ -773,36 +781,36 @@ class SharePoint {
               reject(error);
             });
         else {
-          me.log(`Send email to: ${to}`);
-          me.log(`From: ${from}`);
-          me.log(`Subject: ${subject}`);
-          me.log(`Body: ${body}`);
+          me._log(`Send email to: ${to}`);
+          me._log(`From: ${from}`);
+          me._log(`Subject: ${subject}`);
+          me._log(`Body: ${body}`);
           resolve();
         }
       } else reject("From, To or Subject not provided.");
     });
   }
 
-  log(message) {
-    if (!this.inProduction && config.showConsoleActivityInDev)
-      ErrorLogger.log(message);
+  _log(message) {
+    if (!this._inProduction && config.showConsoleActivityInDev)
+      Error_logger._log(message);
   }
 
-  getListItemType(listName) {
+  _getListItemType(listName) {
     let name = listName.replace(/\s/gi, "_x0020_");
     return `SP.Data.${name[0].toUpperCase() + name.substring(1)}ListItem`;
   }
 
-  getAPIUrl(path) {
+  _getAPIUrl(path) {
     if (path) {
       if (path.indexOf("/") == 0) return path;
       else if (path.indexOf("http") == 0) return path;
-      else return this.baseUrl + path;
+      else return this._baseUrl + path;
     } else return null;
   }
 }
 
-function artificialDevDelay(fn) {
+function _artificialDevDelay(fn) {
   if (config.devLoadDelayMin && config.devLoadDelayMax) {
     let span = Math.max(1, config.devLoadDelayMax - config.devLoadDelayMin),
       delay = Math.round(Math.random() * span + config.devLoadDelayMin);
@@ -812,12 +820,12 @@ function artificialDevDelay(fn) {
   } else fn.call();
 }
 
-/* error logger */
-const ErrorLogger =
-  typeof window == "object" && typeof window.logger == "object"
-    ? window.logger
+/* error _logger */
+const Error_logger =
+  typeof window == "object" && typeof window._logger == "object"
+    ? window._logger
     : {
-        log(message) {
-          console.log(message);
+        _log(message) {
+          console._log(message);
         }
       };
