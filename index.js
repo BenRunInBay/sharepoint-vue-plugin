@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2019-12-23
+    Last updated 2020-01-06
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -134,13 +134,13 @@ class SharePoint {
     }
 
     return new Promise((resolve, reject) => {
-      if (!me.inProduction) {
-        me.digestValue = "dev digest value";
+      if (!me._inProduction) {
+        me._digestValue = "dev digest value";
         resolve("dev digest value");
       } else {
         axios
           .post(
-            me.baseUrl + "_api/contextinfo",
+            me._baseUrl + "_api/contextinfo",
             {},
             {
               withCredentials: true,
@@ -153,11 +153,11 @@ class SharePoint {
           .then(function(response) {
             if (response && response.data) {
               if (response.data.d && response.data.d.GetContextWebInformation)
-                me.digestValue =
+                me._digestValue =
                   response.data.d.GetContextWebInformation.FormDigestValue;
               else if (response.data.FormDigestValue)
-                me.digestValue = response.data.FormDigestValue;
-              resolve(me.digestValue);
+                me._digestValue = response.data.FormDigestValue;
+              resolve(me._digestValue);
             }
             reject("No digest provided");
           })
@@ -187,9 +187,9 @@ class SharePoint {
   get({ baseUrl, path, url, devStaticDataUrl }) {
     let me = this;
     return new Promise((resolve, reject) => {
-      if (me.inProduction) {
+      if (me._inProduction) {
         axios
-          .get(url ? url : (baseUrl ? baseUrl : me.baseUrl) + path, {
+          .get(url ? url : (baseUrl ? baseUrl : me._baseUrl) + path, {
             cache: false,
             withCredentials: true,
             headers: {
@@ -280,19 +280,19 @@ class SharePoint {
     let me = this;
     return new Promise((resolve, reject) => {
       if (path && data) {
-        if (!me.inProduction) {
+        if (!me._inProduction) {
           me._log("Post to SharePoint: ");
           me._log(data);
           resolve(data, "dev item url");
         } else {
-          let postUrl = url ? url : me.baseUrl + path;
+          let postUrl = url ? url : me._baseUrl + path;
           axios
             .post(postUrl, data, {
               withCredentials: true,
               headers: {
                 Accept: "application/json;odata=verbose",
                 "Content-Type": "application/json;odata=verbose",
-                "X-RequestDigest": me.digestValue,
+                "X-RequestDigest": me._digestValue,
                 "X-HTTP-Method": "POST"
               }
             })
@@ -391,7 +391,7 @@ class SharePoint {
     let me = this;
     return new Promise((resolve, reject) => {
       if (listName && itemUrl && itemData) {
-        if (!me.inProduction) {
+        if (!me._inProduction) {
           resolve(itemData);
         } else {
           // obtain updated etag
@@ -417,7 +417,7 @@ class SharePoint {
                     headers: {
                       Accept: "application/json;odata=verbose",
                       "Content-Type": "application/json;odata=verbose",
-                      "X-RequestDigest": me.digestValue,
+                      "X-RequestDigest": me._digestValue,
                       "X-HTTP-Method": "MERGE",
                       "If-Match": etag
                     }
@@ -445,7 +445,7 @@ class SharePoint {
     let me = this;
     return new Promise((resolve, reject) => {
       if (itemUrl) {
-        if (!me.inProduction) {
+        if (!me._inProduction) {
           me._log("Delete item in SharePoint: " + JSON.stringify(itemUrl));
           resolve();
         } else {
@@ -453,7 +453,7 @@ class SharePoint {
             .post(itemUrl, null, {
               withCredentials: true,
               headers: {
-                "X-RequestDigest": me.digestValue,
+                "X-RequestDigest": me._digestValue,
                 "IF-MATCH": "*",
                 "X-HTTP-Method": "DELETE"
               }
@@ -616,7 +616,7 @@ class SharePoint {
   retrievePeopleProfile({ accountName, email = null, property = null }) {
     let me = this;
     return new Promise((resolve, reject) => {
-      if (me.inProduction) {
+      if (me._inProduction) {
         let account = accountName;
         if (!account && email) account = config.accountNamePrefix + email;
         if (account) {
@@ -671,7 +671,7 @@ class SharePoint {
   retrieveCurrentUserProfile() {
     let me = this;
     return new Promise((resolve, reject) => {
-      if (me.inProduction)
+      if (me._inProduction)
         axios
           .get(
             this._getAPIUrl(config.currentUserPropertiesPathPrefix) +
@@ -709,7 +709,7 @@ class SharePoint {
   ensureSiteUserId({ accountName }) {
     let me = this;
     return new Promise((resolve, reject) => {
-      if (me.inProduction)
+      if (me._inProduction)
         axios
           .post(
             this._getAPIUrl(config.ensureUserPathPrefix),
@@ -720,7 +720,7 @@ class SharePoint {
               cache: false,
               withCredentials: true,
               headers: {
-                "X-RequestDigest": me.digestValue,
+                "X-RequestDigest": me._digestValue,
                 accept: "application/json;odata=verbose"
               }
             }
@@ -763,14 +763,14 @@ class SharePoint {
             Body: body
           }
         };
-        if (me.inProduction)
+        if (me._inProduction)
           axios
             .post(this._getAPIUrl(config.sendEmailPathPrefix), mailData, {
               withCredentials: true,
               headers: {
                 Accept: "application/json;odata=verbose",
                 "Content-Type": "application/json;odata=verbose",
-                "X-RequestDigest": me.digestValue,
+                "X-RequestDigest": me._digestValue,
                 "X-HTTP-Method": "POST"
               }
             })
