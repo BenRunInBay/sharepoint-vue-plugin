@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2020-01-06
+    Last updated 2020-01-22b
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -128,7 +128,7 @@ class SharePoint {
         me.getFormDigest().catch(error => {
           return;
         });
-        me._log("Refreshed digest value");
+        _logMessage("Refreshed digest value");
       }, config.formDigestRefreshInterval);
       pvt.formDigestRefreshCount++;
     }
@@ -281,8 +281,8 @@ class SharePoint {
     return new Promise((resolve, reject) => {
       if (path && data) {
         if (!me._inProduction) {
-          me._log("Post to SharePoint: ");
-          me._log(data);
+          _logMessage("Post to SharePoint: ");
+          _logMessage(data);
           resolve(data, "dev item url");
         } else {
           let postUrl = url ? url : me._baseUrl + path;
@@ -392,6 +392,8 @@ class SharePoint {
     return new Promise((resolve, reject) => {
       if (listName && itemUrl && itemData) {
         if (!me._inProduction) {
+          _logMessage("Update in SharePoint: ");
+          _logMessage(itemData);
           resolve(itemData);
         } else {
           // obtain updated etag
@@ -411,6 +413,7 @@ class SharePoint {
                   },
                   itemData
                 );
+                // MERGE to SharePoint with eTag value
                 axios
                   .post(itemUrl, updateData, {
                     withCredentials: true,
@@ -446,7 +449,7 @@ class SharePoint {
     return new Promise((resolve, reject) => {
       if (itemUrl) {
         if (!me._inProduction) {
-          me._log("Delete item in SharePoint: " + JSON.stringify(itemUrl));
+          _logMessage("Delete item in SharePoint: " + JSON.stringify(itemUrl));
           resolve();
         } else {
           axios
@@ -714,7 +717,7 @@ class SharePoint {
           .post(
             this._getAPIUrl(config.ensureUserPathPrefix),
             {
-              _logonName: accountName
+              logonName: accountName
             },
             {
               cache: false,
@@ -781,19 +784,14 @@ class SharePoint {
               reject(error);
             });
         else {
-          me._log(`Send email to: ${to}`);
-          me._log(`From: ${from}`);
-          me._log(`Subject: ${subject}`);
-          me._log(`Body: ${body}`);
+          _logMessage(`Send email to: ${to}`);
+          _logMessage(`From: ${from}`);
+          _logMessage(`Subject: ${subject}`);
+          _logMessage(`Body: ${body}`);
           resolve();
         }
       } else reject("From, To or Subject not provided.");
     });
-  }
-
-  _log(message) {
-    if (!this._inProduction && config.showConsoleActivityInDev)
-      Error_logger._log(message);
   }
 
   _getListItemType(listName) {
@@ -820,12 +818,15 @@ function _artificialDevDelay(fn) {
   } else fn.call();
 }
 
-/* error _logger */
-const Error_logger =
-  typeof window == "object" && typeof window._logger == "object"
-    ? window._logger
-    : {
-        _log(message) {
-          console._log(message);
-        }
-      };
+/* error logger */
+function _logMessage(message) {
+  const ErrorLogger =
+    typeof window == "object" && typeof window.logger == "object"
+      ? window.logger
+      : {
+          log(message) {
+            console.log(message);
+          }
+        };
+  ErrorLogger.log(message);
+}
