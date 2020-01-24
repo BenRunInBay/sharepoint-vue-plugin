@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    Last updated 2020-01-22b
+    @date 2020-01-24
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
