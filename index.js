@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    @date 2020-01-24
+    @date 2020-02-04
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -63,6 +63,15 @@ let baseConfig = {
   pvt = {
     formDigestRefreshCount: 0
   };
+
+const FILTER_REPLACEMENTS = [
+  { find: "+", replace: "%2B" },
+  { find: "/", replace: "%2F" },
+  { find: "?", replace: "%3F" },
+  { find: "%", replace: "%25" },
+  { find: "#", replace: "%23" },
+  { find: "&", replace: "%26" }
+];
 
 /*
     Vue installer
@@ -518,7 +527,7 @@ class SharePoint {
         } else if (compare && typeof compare == "string") {
           searchPattern +=
             (searchPattern.length ? " or " : "") +
-            `${fieldName} ${operator} '${encodeURIComponent(compare)}'`;
+            `${fieldName} ${operator} '${this.encodeFilterValue(compare)}'`;
         }
       });
       return "(" + searchPattern + ")";
@@ -541,11 +550,19 @@ class SharePoint {
         } else if (compare && typeof compare == "string") {
           searchPattern +=
             (searchPattern.length ? " and " : "") +
-            `${fieldName} ${operator} '${encodeURIComponent(compare)}'`;
+            `${fieldName} ${operator} '${this.encodeFilterValue(compare)}'`;
         }
       });
       return "(" + searchPattern + ")";
     } else return "";
+  }
+
+  encodeFilterValue(comparisonValue) {
+    let encodedValue = comparisonValue;
+    FILTER_REPLACEMENTS.forEach(r => {
+      encodedValue = encodedValue.replace(r.find, r.replace);
+    });
+    return encodedValue;
   }
 
   /*
