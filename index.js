@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    @date 2020-02-04
+    @date 2020-02-10
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -175,6 +175,13 @@ class SharePoint {
           });
       }
     });
+  }
+
+  /*
+    Use to change the base URL of the requests
+   */
+  setBaseUrl(newBaseUrl) {
+    this._baseUrl = newBaseUrl;
   }
 
   /* True if request digest is known */
