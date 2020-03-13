@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    @date 2020-02-10
+    @date 2020-03-13
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -64,14 +64,15 @@ let baseConfig = {
     formDigestRefreshCount: 0
   };
 
-const FILTER_REPLACEMENTS = [
-  { find: "+", replace: "%2B" },
-  { find: "/", replace: "%2F" },
-  { find: "?", replace: "%3F" },
-  { find: "%", replace: "%25" },
-  { find: "#", replace: "%23" },
-  { find: "&", replace: "%26" }
-];
+const FILTER_REPLACEMENT_PAIRS = [
+    { char: "%", replacementChar: "%25" },
+    { char: "+", replacementChar: "%2B" },
+    { char: "/", replacementChar: "%2F" },
+    { char: "?", replacementChar: "%3F" },
+    { char: "#", replacementChar: "%23" },
+    { char: "&", replacementChar: "%26" }
+  ],
+  FILTER_REPLACEMENT_CHARS = /[\%\+\/\?\#\&]/g;
 
 /*
     Vue installer
@@ -565,11 +566,12 @@ class SharePoint {
   }
 
   encodeFilterValue(comparisonValue) {
-    let encodedValue = comparisonValue;
-    FILTER_REPLACEMENTS.forEach(r => {
-      encodedValue = encodedValue.replace(r.find, r.replace);
+    return comparisonValue.replace(FILTER_REPLACEMENT_CHARS, theChar => {
+      let replacementPair = FILTER_REPLACEMENT_PAIRS.find(
+        pair => pair.char == theChar
+      );
+      if (replacementPair) return replacementPair.replacementChar;
     });
-    return encodedValue;
   }
 
   /*
