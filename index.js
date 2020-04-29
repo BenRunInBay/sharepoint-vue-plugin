@@ -2,7 +2,7 @@
     SharePoint Vue Plug-in
     https://github.com/BenRunInBay
 
-    @date 2020-03-13
+    @date 2020-04-28
 
     Copy into:
       /src/plugins/SharePoint-vue-plugin
@@ -47,10 +47,11 @@ let baseConfig = {
     profileDefaultSelect:
       "AccountName,DisplayName,Email,PictureUrl,PersonalUrl,Title,UserProfileProperties",
     myProfileDefaultSelect:
-      "DisplayName,AccountName,Email,PictureUrl,PersonalUrl,Title",
+      "Id,DisplayName,AccountName,Email,PictureUrl,PersonalUrl,Title",
     listPath: "_api/Web/Lists/",
     currentUserPropertiesPathPrefix:
       "_api/sp.userprofiles.peoplemanager/getmyproperties/?$select=",
+    siteUsersPathPrefix: "/_api/web/siteusers(@v)?@v=",
     peopleManagerPathPrefix:
       "_api/sp.userprofiles.peoplemanager/GetPropertiesFor(accountName=@v)?@v=",
     ensureUserPathPrefix: "_api/web/ensureuser",
@@ -821,7 +822,7 @@ class SharePoint {
   }
 
   _getListItemType(listName) {
-    let name = listName.replace(/\s/gi, "_x0020_");
+    let name = listName.replace(/\s/gi, "_x0020_").replace(/-/gi, "").replace(/_/gi, "_x005f_");
     return `SP.Data.${name[0].toUpperCase() + name.substring(1)}ListItem`;
   }
 
